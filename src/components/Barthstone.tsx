@@ -3,15 +3,29 @@ import cards from "../game_data/cards"
 import { RawPlayer } from "../game_logic/gameTypes"
 import Game from "./Game"
 import { BarthstoneProvider } from "../game_logic/api/core"
+import { range } from "../utils/utils"
+
+const cardCount = cards.length
+const halfCardCount = Math.floor(cardCount / 2)
+const cardStack = [...cards]
+
+const pickRandomCard = () => {
+  const pickCardIndex = Math.floor(Math.random() * cardStack.length)
+  const pickCard = cardStack[pickCardIndex]
+  cardStack.splice(pickCardIndex, 1)
+  return pickCard
+}
+
+const pickCardsAtRandom = (amount: number) => range(amount).map(i => pickRandomCard())
 
 const player1: RawPlayer = {
   name: "Jonathan",
-  deck: cards.slice(0, 6),
+  deck: pickCardsAtRandom(halfCardCount),
 }
 
 const player2: RawPlayer = {
   name: "Anna",
-  deck: cards.slice(6, 10),
+  deck: pickCardsAtRandom(cardStack.length),
 }
 
 const Barthstone: React.FC = () => {

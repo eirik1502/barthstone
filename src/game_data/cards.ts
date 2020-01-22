@@ -81,6 +81,14 @@ const cards: RawCard[] = [
     damage: 5,
     defence: 5,
   },
+  {
+    name: "Cool gui",
+    image: "",
+    description: "I got sunglasses",
+    cost: 2,
+    damage: 4,
+    defence: 5,
+  },
 ]
 
 export default cards
