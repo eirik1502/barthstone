@@ -1,15 +1,19 @@
-import React, {useCallback, useEffect, useRef, useState, MouseEvent, ReactElement} from "react";
-import {GameCard, GameCardId, GamePlayer, nullGameCardId, Player} from "../game_data/gameTypes";
-import {playerToGame} from "../game_data/convertTypes";
-import {range} from "../game_data/utils";
-import * as PlayerFuncs from "../game_data/playerFuncs";
-import Hand from "./Hand";
-import styled from "styled-components";
-import { DndProvider } from 'react-dnd'
-import { default as DnDBackend } from 'react-dnd-html5-backend'
-import { Provider as ReduxProvider } from 'react-redux'
-import gameStore from '../game_store/mainStore'
-
+import CardCollection from "./CardCollection"
+import styled from "styled-components"
+import { DndProvider } from "react-dnd"
+import { default as DnDBackend } from "react-dnd-html5-backend"
+import { CardId, RawPlayer } from "../game_logic/gameTypes"
+import React, { useEffect, useRef, useState } from "react"
+import imageService from "../services/imageService"
+import { useEndTurn } from "../game_logic/api/endTurn"
+import { usePlayCard } from "../game_logic/api/playCard"
+import { useAttackCardCard } from "../game_logic/api/attackCard"
+import {
+  useCurrentPlayerIndex,
+  usePlayersObservation,
+  useTurnRound,
+} from "../game_logic/api/observations"
+import { useGameCore } from "../game_logic/api/core"
 
 const Arena = styled.div`
   width: 100%;
@@ -24,6 +28,9 @@ const ArenaLeftCol = styled.div`
 
 const ArenaRightCol = styled.div`
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 `
 
 const ArenaCenterCol = styled.div`
@@ -39,175 +46,105 @@ const ArenaCenterRow = styled.div`
 
 const HandArea = styled.div
 
+const imgSize = [128, 96]
+const imgUrl = `https://source.unsplash.com/random/${imgSize[0]}x${imgSize[1]}/`
+
 type Props = {
-    players: Player[]
+  players: RawPlayer[]
 }
 
-enum TurnState {
-    None,
-    Start,
-    Main,
-    End
-}
+const Game: React.FC<Props> = ({ players }) => {
+  useGameCore(players)
+  const [canEndTurn, endTurn] = useEndTurn()
+  const [canPlayCard, playCard] = usePlayCard()
+  const [attackCardCard, canAttackCardCard] = useAttackCardCard()
+  const playersObservation = usePlayersObservation()
+  const currentPlayerIndex = useCurrentPlayerIndex()
+  const turnRound = useTurnRound()
 
-enum GameState {
-    Loading,
-    Start,
-    Play,
-    End
-}
+  // const [imagesLoaded, setImagesLoaded] = useState<boolean>(false)
+  //
+  // useEffect(() => {
+  //   if (playersObservation.length === 2 && !imagesLoaded) {
+  //     console.log("add images")
+  //     playersObservation.forEach(p =>
+  //       p.library.forEach(c => {
+  //         setTimeout(() => imageService.addImg(c.id, imgUrl), 10)
+  //       }),
+  //     )
+  //     setImagesLoaded(true)
+  //   }
+  // }, [playersObservation, imagesLoaded])
 
-type TargetMarker = {
-    x: number
-    y: number
-}
+  const handleEndTurn = () => {
+    endTurn()
+  }
 
-const StyledMarker = styled.div<TargetMarker>`
-  position: absolute;
-  width: 32px;
-  height: 32px;
-  background-color: #ff000055;
-  left: ${props => props.x}px;
-  top: ${props => props.y}px;
-`
+  const handleCardDropOnBoard = (boardPlayerIndex: number, cardId: CardId) => {
+    playCard(cardId)
+  }
 
-const Game: React.FC<Props> = ({players}) => {
-    const [gamePlayers, setGamePayers] = useState<GamePlayer[]>([])
-    const [gameState, setGameState] = useState<GameState>(GameState.Loading)
-    const [turn, setTurn] = useState<number>(-1)
-    const [turnState, setTurnState] = useState<TurnState>(TurnState.None)
-    const [playerTurn, setPlayerTurn] = useState(0)
-    const [selectedBoardCardId, setSelectedBoardCardId] = useState<GameCardId | undefined>(undefined)
-    const [targetMarker, setTargetMarker] = useState<TargetMarker | undefined>(undefined)
-    const marker = useRef<ReactElement | null>(null)
+  const handleCardDropOnBoardCard = (
+    boardPlayerIndex: number,
+    targetBoardCardId: CardId,
+    droppedCardId: CardId,
+  ) => {
+    attackCardCard(droppedCardId, targetBoardCardId)
+  }
 
-    useEffect(() => {
-        if (players.length === 2 && gameState === GameState.Loading) {
-            setGamePayers(players.map(playerToGame))
-            setGameState(GameState.Start)
-            setTurn(0)
-            setTurnState(TurnState.Start)
-            setPlayerTurn(0)
-
-            // window.addEventListener("mousemove", mouseMove)
+  if (playersObservation.length === 2) {
+    const renderBoard = (playerIndex: number) => (
+      <CardCollection
+        key={"board" + playerIndex}
+        isBoard={true}
+        ownerPlayerIndex={playerIndex}
+        currentPlayerIndex={currentPlayerIndex}
+        cards={playersObservation[playerIndex].board}
+        onCardDrop={cardId => handleCardDropOnBoard(playerIndex, cardId)}
+        onCardDropOnCard={(targetCardId, droppedCardId) =>
+          handleCardDropOnBoardCard(playerIndex, targetCardId, droppedCardId)
         }
-    }, [players, gameState])
+        canAttackCardCard={canAttackCardCard}
+        canPlayCard={canPlayCard}
+      />
+    )
 
-    useEffect(() => {
-        if (gameState === GameState.Start) {
-            const drawCount = 3
-            gamePlayers.forEach(p => range(drawCount).forEach(_ => PlayerFuncs.drawCard(p)))
-            setGamePayers([...gamePlayers])
+    const renderHand = (playerIndex: number) => (
+      <CardCollection
+        key={"hand" + playerIndex}
+        isBoard={false}
+        ownerPlayerIndex={playerIndex}
+        currentPlayerIndex={currentPlayerIndex}
+        cards={playersObservation[playerIndex].hand}
+        canAttackCardCard={canAttackCardCard}
+      />
+    )
 
-            setGameState(GameState.Play)
-        }
-    }, [gameState, gamePlayers])
-
-
-    useEffect(() => {
-        if (gameState === GameState.Play && turnState === TurnState.Start) {
-            PlayerFuncs.drawCard(gamePlayers[playerTurn])
-
-            setTurnState(TurnState.Main)
-        }
-    }, [gameState, turnState, playerTurn])
-
-    useEffect(() => {
-        if (gameState === GameState.Play && turnState === TurnState.End) {
-            playerTurn === 1 && setTurn(turn+1)
-            setPlayerTurn((playerTurn + 1) % gamePlayers.length)
-            setTurnState(TurnState.Start)
-        }
-    })
-
-    const currPlayerTurn = (): GamePlayer => {
-        return gamePlayers[playerTurn]
-    }
-
-    const endTurn = () => {
-        if (gameState === GameState.Play && turnState === TurnState.Main) {
-            setTurnState(TurnState.End)
-        }
-    }
-
-    const playCard = (gplayer: GamePlayer, handCardId: GameCardId) => {
-        if (gplayer === gamePlayers[playerTurn]) {
-            PlayerFuncs.playCard(gplayer, handCardId)
-            setGamePayers([...gamePlayers])
-        }
-        setSelectedBoardCardId(undefined)
-    }
-
-    const attack = (attackingPlayer: GamePlayer, attackingCardId: GameCardId, defendingPlayer: GamePlayer, defendingCardId: GameCardId) => {
-        PlayerFuncs.attack(attackingPlayer, attackingCardId, defendingPlayer, defendingCardId)
-        setGamePayers([...gamePlayers])
-    }
-
-    const handleCardDropOnBoard = (boardOwner: GamePlayer, cardId: GameCardId) => {
-        if (currPlayerTurn() === boardOwner) {
-            if (boardOwner.hand.includes(cardId)) {
-                playCard(boardOwner, cardId)
-            }
-        }
-    }
-
-    const handleCardDropOnBoardCard = (boardOwner: GamePlayer, targetBoardCardId: GameCardId, droppedCardId: GameCardId) => {
-        const currPlayer = currPlayerTurn()
-        if (currPlayer !== boardOwner) {
-            if (currPlayer.board.includes(droppedCardId)) {
-                attack(currPlayer, droppedCardId, boardOwner, targetBoardCardId)
-            }
-        }
-    }
-
-
-    if (gamePlayers.length === 2) {
-        const [gplayer1, gplayer2] = gamePlayers;
-        return (
-            // <ReduxProvider store={gameStore}>
-                <DndProvider backend={DnDBackend}>
-                    <Arena>
-                        <ArenaLeftCol/>
-                        <ArenaCenterCol>
-                            <ArenaCenterRow>
-                                <Hand
-                                    cards={PlayerFuncs.cardIdsToCards(gplayer2.deck, gplayer2.hand)}
-                                />
-                            </ArenaCenterRow>
-                            <ArenaCenterRow>
-                                <Hand
-                                    cards={PlayerFuncs.cardIdsToCards(gplayer2.deck, gplayer2.board)}
-                                    selectedCardId={selectedBoardCardId}
-                                    onCardDrop={card => handleCardDropOnBoard(gplayer2, card.id)}
-                                    onCardDropOnCard={(targetCard, droppedCard) =>
-                                        handleCardDropOnBoardCard(gplayer2, targetCard.id, droppedCard.id)
-                                    }
-                                />
-                            </ArenaCenterRow>
-                            <ArenaCenterRow>
-                                <Hand
-                                    cards={PlayerFuncs.cardIdsToCards(gplayer1.deck, gplayer1.board)}
-                                    selectedCardId={selectedBoardCardId}
-                                    onCardDrop={(card: GameCard) => handleCardDropOnBoard(gplayer1, card.id)}
-                                />
-                            </ArenaCenterRow>
-                            <ArenaCenterRow>
-                                <Hand
-                                    cards={PlayerFuncs.cardIdsToCards(gplayer1.deck, gplayer1.hand)}
-                                />
-                            </ArenaCenterRow>
-                        </ArenaCenterCol>
-                        <ArenaRightCol>
-                            <button onClick={endTurn}>End turn</button>
-                        </ArenaRightCol>
-                    </Arena>
-                </DndProvider>
-            // </ReduxProvider>
-        )
-    }
-    else {
-        return <div>Loading...</div>
-    }
+    return (
+      <DndProvider backend={DnDBackend}>
+        <Arena>
+          <ArenaLeftCol />
+          <ArenaCenterCol>
+            <ArenaCenterRow>{renderHand(1)}</ArenaCenterRow>
+            <ArenaCenterRow>{renderBoard(1)}</ArenaCenterRow>
+            <ArenaCenterRow>{renderBoard(0)}</ArenaCenterRow>
+            <ArenaCenterRow>{renderHand(0)}</ArenaCenterRow>
+          </ArenaCenterCol>
+          <ArenaRightCol>
+            <span>Mana: {playersObservation[1].mana}</span>
+            <button style={{ height: "64px", width: "128px" }} onClick={handleEndTurn}>
+              End turn
+            </button>
+            <br />
+            <span>{`Turn: ${turnRound}`}</span>
+            <span>Mana: {playersObservation[0].mana}</span>
+          </ArenaRightCol>
+        </Arena>
+      </DndProvider>
+    )
+  } else {
+    return <div>Loading...</div>
+  }
 }
 
 export default Game

@@ -1,17 +1,27 @@
-import React, {Ref} from "react";
-import styled from 'styled-components'
-import {CardDragItem, DragItemType, GameCard} from "../game_data/gameTypes";
-import {useDrag, useDrop} from 'react-dnd'
+import React, { Ref } from "react"
+import styled from "styled-components"
+import { useDrag, useDrop } from "react-dnd"
+import { CardDragItem, DragItemType } from "../frontend/dndTypes"
+import { Card as CardT, CardId } from "../game_logic/gameTypes"
+import { Simulate } from "react-dom/test-utils"
+import { CostField, DamageField, DefenceField } from "./AttributeFields"
+import RandomImage from "./RandomImage"
+import imageService from "../services/imageService"
+import { useCardImage } from "../services/useCardImage"
 
 type Props = {
-    card: GameCard
-    onClick: () => void
-    selected?: boolean
-    onCardDrop?: (card: GameCard) => void
+  card: CardT
+  onClick: () => void
+  onCardDrop?: (cardId: CardId) => void
+  cardCanAttackThis?: (cardId: CardId) => boolean
+  canPlay?: () => boolean
+  canBeTargeted?: boolean
+  canBePicked?: boolean
 }
 
 type WrapperProps = {
-    selected?: boolean
+  canBeTargeted?: boolean
+  canBePicked?: boolean
 }
 const Wrapper = styled.div<WrapperProps>`
   width: 128px;
@@ -23,14 +33,23 @@ const Wrapper = styled.div<WrapperProps>`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  
-  transition: border-color 0.2s;
-  
+
+  box-shadow: 0 0px 12px
+    ${props => (props.canBeTargeted && `8px`) || (props.canBePicked && `8px`) || `2px`}
+    ${props => (props.canBeTargeted && `#de6a4e`) || (props.canBePicked && `#59e292`) || `#565131`};
+
+  transition: border-color 0.2s, box-shadow 0.2s;
+
   &:hover {
-    border-color: ${props => props.selected? `#773b37`:`#77734f`};
+    border-color: #565131;
   }
-  
-  ${props => props.selected && `border-color: red`}
+`
+// border-color: ${props =>
+//       (props.canBeTargeted && `#773b37`) || (props.canBePicked && `#2b7149`) || `#565131`};
+
+const TopField = styled.div`
+  display: flex;
+  justify-content: space-between;
 `
 
 const TitleField = styled.div``
@@ -44,60 +63,55 @@ const StatsField = styled.div`
   justify-content: space-between;
 `
 
-const DamageField = styled.div`
-  width: 32px;
-  height: 32px;
-  background-color: #fb1a18;
-  border-radius: 32px;
-  border: black solid 2px;
-  font-size: 32px;
-   text-align: center;
-`
+const Card: React.FC<Props> = ({
+  card,
+  onClick,
+  onCardDrop,
+  canPlay,
+  cardCanAttackThis,
+  canBeTargeted,
+  canBePicked,
+}) => {
+  const [dragProps, dragRef] = useDrag({
+    item: { type: DragItemType.gameCard, id: card.id, cardId: card.id },
+  })
 
-const DefenceField = styled.div`
-  width: 32px;
-  height: 32px;
-  background-color: #1c3bfb;
-  border-radius: 32px;
-  border: black solid 2px;
-  font-size: 32px;
-  text-align: center;
-`
+  const canDrop = (item: CardDragItem) => !cardCanAttackThis || cardCanAttackThis(item.cardId)
+  const [dropProps, dropRef] = useDrop({
+    accept: DragItemType.gameCard,
+    drop: (item: CardDragItem) => {
+      console.log("card on card", item.cardId)
+      onCardDrop && onCardDrop(item.cardId)
+    },
+    canDrop,
+    collect: monitor => ({
+      // monitor.canDrop() throws an error :(
+      canBeDroppedOn: monitor.getItem() && canDrop(monitor.getItem()),
+    }),
+  })
 
-const Card: React.FC<Props> = ({card, onClick, selected, onCardDrop}) => {
-    const [dragProps, dragRef] = useDrag({
-        item: {type: DragItemType.gameCard, gameCard: card}
-    })
+  const cardImg = useCardImage(card.id)
 
-    const [dropProps, dropRef] = useDrop({
-        accept: DragItemType.gameCard,
-        drop: (item: CardDragItem) => {
-            console.log("card on card", item.gameCard.id)
-            onCardDrop && onCardDrop(item.gameCard)
-        }
-    })
-
-    return (
-        <Wrapper ref={r => dragRef(r) && dropRef(r)} onClick={onClick} selected={selected}>
-            <TitleField>
-                {card.cardData.name}
-            </TitleField>
-            <Image>
-                {card.cardData.image}
-            </Image>
-            <Description>
-                {card.cardData.description}
-            </Description>
-            <StatsField>
-                <DamageField>
-                    {card.damage}
-                </DamageField>
-                <DefenceField>
-                    {card.defence}
-                </DefenceField>
-            </StatsField>
-        </Wrapper>
-    )
+  return (
+    <Wrapper
+      key={card.id}
+      ref={r => dragRef(r) && dropRef(r)}
+      onClick={onClick}
+      canBeTargeted={canBeTargeted || dropProps.canBeDroppedOn}
+      canBePicked={canBePicked}
+    >
+      <TopField>
+        <TitleField>{card.cardData.name} </TitleField>
+        <CostField>{card.cost}</CostField>
+      </TopField>
+      <Image>Card image</Image>
+      <Description>{card.cardData.description}</Description>
+      <StatsField>
+        <DamageField>{card.damage}</DamageField>
+        <DefenceField>{card.defence}</DefenceField>
+      </StatsField>
+    </Wrapper>
+  )
 }
 
 export default Card
