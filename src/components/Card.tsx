@@ -26,6 +26,7 @@ type WrapperProps = {
 const Wrapper = styled.div<WrapperProps>`
   width: 128px;
   height: 100%;
+  //height: 384px;
   box-sizing: border-box;
   background-color: #61dafb;
   border: black solid 6px;
@@ -46,6 +47,10 @@ const Wrapper = styled.div<WrapperProps>`
 `
 // border-color: ${props =>
 //       (props.canBeTargeted && `#773b37`) || (props.canBePicked && `#2b7149`) || `#565131`};
+
+const CardRow = styled.div`
+  flex: 1;
+`
 
 const TopField = styled.div`
   display: flex;
@@ -90,8 +95,6 @@ const Card: React.FC<Props> = ({
     }),
   })
 
-  const cardImg = useCardImage(card.id)
-
   return (
     <Wrapper
       key={card.id}
@@ -100,16 +103,28 @@ const Card: React.FC<Props> = ({
       canBeTargeted={canBeTargeted || dropProps.canBeDroppedOn}
       canBePicked={canBePicked}
     >
-      <TopField>
-        <TitleField>{card.cardData.name} </TitleField>
-        <CostField>{card.cost}</CostField>
-      </TopField>
-      <Image>Card image</Image>
-      <Description>{card.cardData.description}</Description>
-      <StatsField>
-        <DamageField>{card.damage}</DamageField>
-        <DefenceField>{card.defence}</DefenceField>
-      </StatsField>
+      <CardRow>
+        <TopField>
+          <TitleField>{card.cardData.name} </TitleField>
+          <CostField>{card.cost}</CostField>
+        </TopField>
+      </CardRow>
+      <CardRow>
+        {card.image ? (
+          <img src={card.image} style={{ width: "100%", height: "100%" }} />
+        ) : (
+          <Image>Card image</Image>
+        )}
+      </CardRow>
+      <CardRow>
+        <Description>{card.cardData.description}</Description>
+      </CardRow>
+      <CardRow>
+        <StatsField>
+          <DamageField>{card.damage}</DamageField>
+          <DefenceField>{card.defence}</DefenceField>
+        </StatsField>
+      </CardRow>
     </Wrapper>
   )
 }

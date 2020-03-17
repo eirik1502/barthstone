@@ -1,4 +1,7 @@
+export type CardId = string
+
 export type RawCard = {
+  id?: CardId
   name: string
   image: string
   description: string
@@ -12,14 +15,13 @@ export type RawPlayer = {
   deck: RawCard[]
 }
 
-export type CardId = string
-
 export type Card = {
   id: CardId
   cardData: RawCard
   cost: number
   damage: number
   defence: number
+  image?: string
 }
 
 export type PlayerCardStack = "library" | "hand" | "board" | "graveyard"

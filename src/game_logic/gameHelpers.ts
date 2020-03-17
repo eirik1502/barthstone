@@ -6,10 +6,11 @@ import { nullCard } from "./nullData"
 
 export const initCardFromRawCard = (card: RawCard): Card => ({
   cardData: { ...card },
-  id: card.name,
+  id: card.id ? card.id : card.name,
   cost: card.cost,
   damage: card.damage,
   defence: card.defence,
+  image: card.image,
 })
 
 export const initCardsFromRawCards = (cards: RawCard[]): Card[] => cards.map(initCardFromRawCard)
