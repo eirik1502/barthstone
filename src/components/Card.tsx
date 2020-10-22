@@ -117,7 +117,7 @@ const Card: React.FC<Props> = ({
         )}
       </CardRow>
       <CardRow>
-        <Description>{card.cardData.description}</Description>
+        <Description dangerouslySetInnerHTML={{ __html: card.cardData.description }}></Description>
       </CardRow>
       <CardRow>
         <StatsField>
